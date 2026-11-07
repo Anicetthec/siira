@@ -1,6 +1,6 @@
-const CACHE = 'siira-client-v1';
+const CACHE = 'siira-client-v2';
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(['/', '/index.html'])));
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(['/', '/index.html', '/manifest.webmanifest', '/siira-logo.svg', '/icon-192.png', '/icon-512.png'])));
   self.skipWaiting();
 });
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
@@ -11,4 +11,7 @@ self.addEventListener('fetch', (event) => {
     void caches.open(CACHE).then((cache) => cache.put(event.request, copy));
     return response;
   })));
+});
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
 });
