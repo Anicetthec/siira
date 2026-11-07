@@ -36,7 +36,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    fetch('http://localhost:3000/api/trips')
+    fetch('https://siira-api.onrender.com/api/trips')
       .then(async (response) => {
         if (!response.ok) throw new Error('API trips unavailable');
         return response.json() as Promise<Array<{ departureAt: string; route: { departureCity: string; arrivalCity: string }; vehicle: { registration: string; seatCount: number }; _count: { tickets: number }; status: string }>>;
@@ -56,7 +56,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    fetch('http://localhost:3000/api/baggage')
+    fetch('https://siira-api.onrender.com/api/baggage')
       .then(async (response) => {
         if (!response.ok) throw new Error('API baggage unavailable');
         return response.json() as Promise<Baggage[]>;
@@ -107,7 +107,7 @@ function App() {
     const body = JSON.stringify({ ticketReference: form.get('ticketReference'), description: form.get('description'), weightKg: Number(form.get('weightKg')), note: form.get('note') || undefined, requestId: crypto.randomUUID() });
     try {
       if (!online) throw new Error('offline');
-      const response = await fetch('http://localhost:3000/api/baggage', {
+      const response = await fetch('https://siira-api.onrender.com/api/baggage', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body,
@@ -122,7 +122,7 @@ function App() {
       notify(`Bagage enregistré : ${created.trackingCode}.`);
     } catch (error) {
       if (!online) {
-        queueRequest({ url: 'http://localhost:3000/api/baggage', method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+        queueRequest({ url: 'https://siira-api.onrender.com/api/baggage', method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
         setPending(pendingCount());
         setModal(null);
         notify('Bagage enregistré hors ligne. Synchronisation automatique au retour du réseau.');
@@ -134,7 +134,7 @@ function App() {
     try {
       const body = JSON.stringify({ status });
       if (!online) throw new Error('offline');
-      const response = await fetch(`http://localhost:3000/api/baggage/${encodeURIComponent(trackingCode)}/status`, {
+      const response = await fetch(`https://siira-api.onrender.com/api/baggage/${encodeURIComponent(trackingCode)}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body,
@@ -145,7 +145,7 @@ function App() {
       notify(`Statut du bagage ${trackingCode} mis à jour.`);
     } catch {
       if (!online) {
-        queueRequest({ url: `http://localhost:3000/api/baggage/${encodeURIComponent(trackingCode)}/status`, method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
+        queueRequest({ url: `https://siira-api.onrender.com/api/baggage/${encodeURIComponent(trackingCode)}/status`, method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
         setPending(pendingCount());
         notify('Mise à jour enregistrée hors ligne. Elle sera synchronisée au retour du réseau.');
       } else notify('Le statut n’a pas pu être mis à jour.');
@@ -167,10 +167,10 @@ function App() {
     const reference = String(new FormData(event.currentTarget).get('reference') ?? '').trim();
     if (!reference) return;
     try {
-      const lookup = await fetch(`http://localhost:3000/api/tickets/${encodeURIComponent(reference)}`);
+      const lookup = await fetch(`https://siira-api.onrender.com/api/tickets/${encodeURIComponent(reference)}`);
       if (!lookup.ok) throw new Error('Billet introuvable');
       const ticket = await lookup.json() as { qrToken: string; seat: { number: string } };
-      const board = await fetch(`http://localhost:3000/api/tickets/${encodeURIComponent(reference)}/board`, {
+      const board = await fetch(`https://siira-api.onrender.com/api/tickets/${encodeURIComponent(reference)}/board`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ qrToken: ticket.qrToken }),
@@ -191,7 +191,7 @@ function App() {
   async function loginCompany(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const response = await fetch('http://localhost:3000/api/auth/societe/login', {
+    const response = await fetch('https://siira-api.onrender.com/api/auth/societe/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: form.get('email'), password: form.get('password') }),

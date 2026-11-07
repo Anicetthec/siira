@@ -31,7 +31,7 @@ function App() {
   async function submitAccount(event: FormEvent<HTMLFormElement>, mode: 'login' | 'register') {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const response = await fetch(`http://localhost:3000/api/auth/client/${mode}`, {
+    const response = await fetch(`https://siira-api.onrender.com/api/auth/client/${mode}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fullName: form.get('fullName'), phone: form.get('phone'), password: form.get('password') }),
@@ -49,7 +49,7 @@ function App() {
   async function search(event: FormEvent) {
     event.preventDefault();
     try {
-      const response = await fetch(`http://localhost:3000/api/trips?departureCity=${encodeURIComponent(departure.trim())}&arrivalCity=${encodeURIComponent(arrival.trim())}`);
+      const response = await fetch(`https://siira-api.onrender.com/api/trips?departureCity=${encodeURIComponent(departure.trim())}&arrivalCity=${encodeURIComponent(arrival.trim())}`);
       if (!response.ok) throw new Error('Recherche indisponible');
       setTrips(await response.json());
     } catch {
@@ -70,7 +70,7 @@ function App() {
     const body = JSON.stringify({ tripId: selected.id, seatId: selected.seats[0].id, fullName: form.get('fullName'), phone: form.get('phone'), paymentProvider: form.get('paymentProvider'), requestId });
     try {
       if (!online) throw new Error('offline');
-      const response = await fetch('http://localhost:3000/api/tickets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+      const response = await fetch('https://siira-api.onrender.com/api/tickets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
       if (!response.ok) throw new Error('Réservation impossible');
       const ticket = await response.json() as { reference: string };
       setMessage(`Réservation confirmée : ${ticket.reference}.`);
@@ -78,7 +78,7 @@ function App() {
       setDialog(null);
     } catch {
       if (!online) {
-        queueRequest({ url: 'http://localhost:3000/api/tickets', method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+        queueRequest({ url: 'https://siira-api.onrender.com/api/tickets', method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
         setPending(pendingCount());
         setMessage('Réservation enregistrée hors ligne. Elle sera synchronisée dès le retour d’Internet.');
       } else setMessage('Cette place n’est plus disponible ou l’API est indisponible.');
@@ -89,7 +89,7 @@ function App() {
   async function lookupTicket(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     try {
-      const response = await fetch(`http://localhost:3000/api/tickets/${encodeURIComponent(ticketReference)}`);
+      const response = await fetch(`https://siira-api.onrender.com/api/tickets/${encodeURIComponent(ticketReference)}`);
       if (!response.ok) throw new Error('Billet introuvable');
       const ticket = await response.json() as { status: string; trip: { route: { departureCity: string; arrivalCity: string } }; seat: { number: string } };
       setMessage(`Billet ${ticketReference} : ${ticket.status} · ${ticket.trip.route.departureCity} → ${ticket.trip.route.arrivalCity} · place ${ticket.seat.number}.`);
@@ -103,7 +103,7 @@ function App() {
   async function lookupBaggage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     try {
-      const response = await fetch(`http://localhost:3000/api/baggage/${encodeURIComponent(baggageTrackingCode)}`);
+      const response = await fetch(`https://siira-api.onrender.com/api/baggage/${encodeURIComponent(baggageTrackingCode)}`);
       if (!response.ok) throw new Error('Bagage introuvable');
       const baggage = await response.json() as { status: string; description: string; weightKg: number; ticket: { trip: { route: { departureCity: string; arrivalCity: string } } } };
       const status = { REGISTERED: 'enregistré', RECEIVED: 'reçu à l’agence', LOADED: 'chargé', IN_TRANSIT: 'en transit', ARRIVED: 'arrivé', DELIVERED: 'remis au client', INCIDENT: 'signalé en incident' }[baggage.status] ?? baggage.status;
