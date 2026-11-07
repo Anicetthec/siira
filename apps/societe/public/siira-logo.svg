@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title">
+  <title>Siira</title>
+  <rect width="128" height="128" rx="25" fill="#2864e8"/>
+  <text x="64" y="71" text-anchor="middle" fill="#fff" font-family="Arial,sans-serif" font-size="39" font-weight="400">siira</text>
+  <path d="M37 87c17 13 37 13 54 0" fill="none" stroke="#ffda65" stroke-linecap="round" stroke-width="7"/>
+</svg>

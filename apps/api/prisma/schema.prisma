@@ -1,0 +1,252 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN_FASO
+  COMPANY_ADMIN
+  AGENCY_MANAGER
+  COUNTER_AGENT
+  BOARDING_AGENT
+}
+
+enum TripStatus {
+  PLANNED
+  BOARDING
+  DEPARTED
+  COMPLETED
+  CANCELLED
+}
+
+enum SeatStatus {
+  AVAILABLE
+  RESERVED
+  SOLD
+  BOARDED
+}
+
+enum TicketStatus {
+  PENDING_PAYMENT
+  PAID
+  CANCELLED
+  REFUNDED
+  BOARDED
+}
+
+enum PaymentStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentProvider {
+  ORANGE_MONEY
+  MOOV_MONEY
+  TELECEL_MONEY
+  WAVE
+  CASH
+}
+
+enum BaggageStatus {
+  REGISTERED
+  RECEIVED
+  LOADED
+  IN_TRANSIT
+  ARRIVED
+  DELIVERED
+  INCIDENT
+}
+
+model User {
+  id           String       @id @default(uuid())
+  email        String?      @unique
+  phone        String?      @unique
+  fullName     String
+  passwordHash String
+  role         UserRole
+  companyId    String?
+  agencyId     String?
+  company      Company?     @relation(fields: [companyId], references: [id])
+  agency       Agency?      @relation(fields: [agencyId], references: [id])
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+}
+
+model Company {
+  id          String       @id @default(uuid())
+  name        String
+  code        String       @unique
+  phone       String
+  users       User[]
+  agencies    Agency[]
+  vehicles    Vehicle[]
+  trips       Trip[]
+  subscriptions Subscription[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Agency {
+  id        String    @id @default(uuid())
+  name      String
+  city      String
+  companyId String
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  counters  Counter[]
+  users     User[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([companyId])
+}
+
+model Counter {
+  id        String   @id @default(uuid())
+  name      String
+  agencyId  String
+  agency    Agency   @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  tickets   Ticket[]
+  createdAt DateTime @default(now())
+}
+
+model Vehicle {
+  id          String   @id @default(uuid())
+  registration String   @unique
+  label       String
+  seatCount   Int
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  trips       Trip[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Route {
+  id             String   @id @default(uuid())
+  departureCity  String
+  arrivalCity    String
+  distanceKm     Int?
+  trips          Trip[]
+  createdAt      DateTime @default(now())
+
+  @@unique([departureCity, arrivalCity])
+}
+
+model Trip {
+  id          String     @id @default(uuid())
+  departureAt DateTime
+  arrivalAt   DateTime?
+  price       Int
+  status      TripStatus @default(PLANNED)
+  companyId   String
+  vehicleId   String
+  routeId     String
+  company     Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  vehicle     Vehicle    @relation(fields: [vehicleId], references: [id])
+  route       Route      @relation(fields: [routeId], references: [id])
+  seats       Seat[]
+  tickets     Ticket[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([companyId, departureAt])
+}
+
+model Seat {
+  id       String     @id @default(uuid())
+  number   String
+  status   SeatStatus @default(AVAILABLE)
+  tripId   String
+  trip     Trip       @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  ticket   Ticket?
+
+  @@unique([tripId, number])
+}
+
+model Customer {
+  id        String   @id @default(uuid())
+  fullName  String
+  phone     String   @unique
+  passwordHash String?
+  tickets   Ticket[]
+  createdAt DateTime @default(now())
+}
+
+model Ticket {
+  id          String       @id @default(uuid())
+  reference   String       @unique
+  qrToken     String       @unique
+  status      TicketStatus @default(PENDING_PAYMENT)
+  amount      Int
+  customerId  String
+  tripId      String
+  seatId      String       @unique
+  counterId   String?
+  customer    Customer     @relation(fields: [customerId], references: [id])
+  trip        Trip         @relation(fields: [tripId], references: [id])
+  seat        Seat         @relation(fields: [seatId], references: [id])
+  counter     Counter?     @relation(fields: [counterId], references: [id])
+  payments    Payment[]
+  baggage     Baggage[]
+  refund      Refund?
+  requestId   String?        @unique
+  boardedAt   DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([tripId, status])
+}
+
+model Baggage {
+  id            String        @id @default(uuid())
+  trackingCode  String        @unique
+  description   String
+  weightKg      Int
+  status        BaggageStatus @default(REGISTERED)
+  note          String?
+  ticketId      String
+  requestId     String?      @unique
+  ticket        Ticket        @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([ticketId])
+  @@index([status])
+}
+
+model Payment {
+  id          String          @id @default(uuid())
+  amount      Int
+  provider    PaymentProvider
+  status      PaymentStatus   @default(PENDING)
+  externalRef String?
+  ticketId    String
+  ticket      Ticket          @relation(fields: [ticketId], references: [id])
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+model Refund {
+  id        String   @id @default(uuid())
+  amount    Int
+  reason    String
+  ticketId  String   @unique
+  ticket    Ticket   @relation(fields: [ticketId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model Subscription {
+  id        String   @id @default(uuid())
+  startsAt  DateTime
+  endsAt    DateTime
+  amount    Int
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}

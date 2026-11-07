@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: faso_transport
+      POSTGRES_USER: faso
+      POSTGRES_PASSWORD: faso_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - faso_transport_data:/var/lib/postgresql/data
+
+volumes:
+  faso_transport_data:

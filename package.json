@@ -1,0 +1,21 @@
+{
+  "name": "faso-transport",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev --workspace apps/api\" \"npm run dev --workspace apps/societe\" \"npm run dev --workspace apps/client\"",
+    "build": "npm run build --workspace apps/api && npm run build --workspace apps/societe && npm run build --workspace apps/client",
+    "db:generate": "npm run prisma:generate --workspace apps/api",
+    "db:validate": "npm run prisma:validate --workspace apps/api",
+    "db:migrate": "npm exec --workspace apps/api -- prisma migrate dev --schema prisma/schema.prisma",
+    "db:push": "npm exec --workspace apps/api -- prisma db push --schema prisma/schema.prisma",
+    "db:seed": "npm run prisma:seed --workspace apps/api"
+  },
+  "workspaces": [
+    "apps/api",
+    "apps/societe",
+    "apps/client"
+  ],
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
