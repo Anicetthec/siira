@@ -5,18 +5,19 @@ import { pendingCount, queueRequest, syncQueue } from './offline';
 
 type Module = 'dashboard' | 'trips' | 'sales' | 'baggage' | 'agencies' | 'fleet' | 'finance';
 type Baggage = { trackingCode: string; description: string; weightKg: number; status: string; note?: string; ticket: { reference: string; customer: { fullName: string; phone: string }; trip: { route: { departureCity: string; arrivalCity: string } } } };
+type SaleTrip = { id: string; time: string; route: string; vehicle: string; sold: number; seats: number; status: string; availableSeatId?: string; availableSeatNumber?: string; price?: number };
 
 const initialTrips = [
-  { time: '07:00', route: 'Ouagadougou → Bobo-Dioulasso', vehicle: 'BF 3021 AB', sold: 44, seats: 50, status: 'Embarquement' },
-  { time: '09:30', route: 'Ouagadougou → Koudougou', vehicle: 'BF 1847 AC', sold: 32, seats: 50, status: 'Planifié' },
-  { time: '11:00', route: 'Bobo-Dioulasso → Ouagadougou', vehicle: 'BF 2088 AA', sold: 23, seats: 50, status: 'Planifié' },
+  { id: 'demo-1', time: '07:00', route: 'Ouagadougou → Bobo-Dioulasso', vehicle: 'BF 3021 AB', sold: 44, seats: 50, status: 'Embarquement' },
+  { id: 'demo-2', time: '09:30', route: 'Ouagadougou → Koudougou', vehicle: 'BF 1847 AC', sold: 32, seats: 50, status: 'Planifié' },
+  { id: 'demo-3', time: '11:00', route: 'Bobo-Dioulasso → Ouagadougou', vehicle: 'BF 2088 AA', sold: 23, seats: 50, status: 'Planifié' },
 ];
 
 const money = (amount: number) => new Intl.NumberFormat('fr-FR').format(amount);
 
 function App() {
   const [active, setActive] = useState<Module>('dashboard');
-  const [trips, setTrips] = useState(initialTrips);
+  const [trips, setTrips] = useState<SaleTrip[]>(initialTrips);
   const [baggage, setBaggage] = useState<Baggage[]>([]);
   const [notice, setNotice] = useState('');
   const [modal, setModal] = useState<'trip' | 'sale' | 'baggage' | 'scan' | 'help' | 'profile' | 'login' | null>(null);
@@ -39,17 +40,21 @@ function App() {
     fetch('https://siira-api.onrender.com/api/trips')
       .then(async (response) => {
         if (!response.ok) throw new Error('API trips unavailable');
-        return response.json() as Promise<Array<{ departureAt: string; route: { departureCity: string; arrivalCity: string }; vehicle: { registration: string; seatCount: number }; _count: { tickets: number }; status: string }>>;
+        return response.json() as Promise<Array<{ id: string; departureAt: string; price: number; route: { departureCity: string; arrivalCity: string }; vehicle: { registration: string; seatCount: number }; seats: Array<{ id: string; number: string }>; _count: { tickets: number }; status: string }>>;
       })
       .then((apiTrips) => {
         if (apiTrips.length === 0) return;
         setTrips(apiTrips.map((trip) => ({
+          id: trip.id,
           time: new Date(trip.departureAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
           route: `${trip.route.departureCity} → ${trip.route.arrivalCity}`,
           vehicle: trip.vehicle.registration,
           sold: trip._count.tickets,
           seats: trip.vehicle.seatCount,
           status: trip.status === 'BOARDING' ? 'Embarquement' : 'Planifié',
+          availableSeatId: trip.seats[0]?.id,
+          availableSeatNumber: trip.seats[0]?.number,
+          price: trip.price,
         })));
       })
       .catch(() => undefined);
@@ -84,6 +89,7 @@ function App() {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     setTrips((current) => [...current, {
+      id: `local-${crypto.randomUUID()}`,
       time: String(form.get('time')),
       route: `${form.get('departure')} → ${form.get('arrival')}`,
       vehicle: String(form.get('vehicle')),
@@ -95,10 +101,35 @@ function App() {
     notify('Voyage créé et publié aux agences.');
   }
 
+  function printReceipt(title: string, content: string) {
+    const receipt = window.open('', '_blank', 'width=480,height=700');
+    if (!receipt) {
+      notify('Autorisez les fenêtres pop-up pour imprimer le reçu.');
+      return;
+    }
+    receipt.document.write(`<html lang="fr"><head><title>${title}</title><style>body{font-family:Arial,sans-serif;padding:28px;color:#17221e}h1{font-size:20px;border-bottom:2px solid #f2a900;padding-bottom:12px}p{line-height:1.6;border-bottom:1px dashed #ccc;padding-bottom:10px}</style></head><body>${content}<script>window.onload=()=>window.print();</script></body></html>`);
+    receipt.document.close();
+  }
+
   function sellTicket(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setModal(null);
-    notify('Billet FT-2026-00482 confirmé. Le reçu peut être envoyé par SMS.');
+    const form = new FormData(event.currentTarget);
+    const trip = trips.find((item) => item.id === form.get('tripId'));
+    if (!trip?.availableSeatId) {
+      notify('Aucune place disponible pour ce voyage.');
+      return;
+    }
+    void fetch('https://siira-api.onrender.com/api/tickets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tripId: trip.id, seatId: trip.availableSeatId, fullName: form.get('fullName'), phone: form.get('phone'), paymentProvider: form.get('paymentProvider'), counterId: 'GUICHET-CENTRAL', requestId: crypto.randomUUID() }),
+    }).then(async (response) => {
+      const result = await response.json().catch(() => null) as { reference?: string; message?: string; amount?: number; seat?: { number: string }; trip?: { route: { departureCity: string; arrivalCity: string } } } | null;
+      if (!response.ok || !result?.reference) throw new Error(result?.message ?? 'Vente impossible');
+      setModal(null);
+      notify(`Billet ${result.reference} confirmé.`);
+      printReceipt('Reçu de billet', `<h1>Siira · Reçu de billet</h1><p><b>Référence :</b> ${result.reference}</p><p><b>Passager :</b> ${form.get('fullName')}<br><b>Téléphone :</b> ${form.get('phone')}</p><p><b>Trajet :</b> ${result.trip?.route.departureCity ?? trip.route}<br><b>Place :</b> ${result.seat?.number ?? trip.availableSeatNumber}</p><p><b>Montant :</b> ${money(result.amount ?? trip.price ?? 0)} FCFA</p><p>Présentez ce reçu au guichet Siira.</p>`);
+    }).catch((error: unknown) => notify(error instanceof Error ? error.message : 'Vente impossible.'));
   }
 
   async function registerBaggage(event: FormEvent<HTMLFormElement>) {
@@ -120,6 +151,7 @@ function App() {
       setBaggage((current) => [created, ...current]);
       setModal(null);
       notify(`Bagage enregistré : ${created.trackingCode}.`);
+      printReceipt('Reçu bagage', `<h1>Siira · Reçu bagage</h1><p><b>Code de suivi :</b> ${created.trackingCode}</p><p><b>Billet :</b> ${created.ticket.reference}<br><b>Voyageur :</b> ${created.ticket.customer.fullName}<br><b>Trajet :</b> ${created.ticket.trip.route.departureCity} → ${created.ticket.trip.route.arrivalCity}</p><p><b>Bagage :</b> ${created.description}<br><b>Poids :</b> ${created.weightKg} kg</p><p>Conservez ce reçu pour le retrait du bagage.</p>`);
     } catch (error) {
       if (!online) {
         queueRequest({ url: 'https://siira-api.onrender.com/api/baggage', method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
@@ -128,6 +160,7 @@ function App() {
         notify('Bagage enregistré hors ligne. Synchronisation automatique au retour du réseau.');
       } else notify(error instanceof Error ? error.message : 'Impossible d’enregistrer le bagage.');
     }
+
   }
 
   async function updateBaggageStatus(trackingCode: string, status: string) {
@@ -231,7 +264,7 @@ function App() {
         {active === 'finance' && <Finance />}
       </section>
       {modal === 'trip' && <Modal title="Créer un voyage" close={() => setModal(null)}><form className="form" onSubmit={createTrip}><div className="form-grid"><label>Départ<input name="departure" defaultValue="Ouagadougou" required /></label><label>Arrivée<input name="arrival" placeholder="Bobo-Dioulasso" required /></label><label>Heure<input name="time" type="time" defaultValue="14:00" required /></label><label>Places<input name="seats" type="number" defaultValue="50" min="10" required /></label><label className="full">Véhicule<select name="vehicle"><option>BF 3021 AB · Autocar 50 places</option><option>BF 1847 AC · Autocar 50 places</option></select></label></div><button type="submit">Publier le voyage</button></form></Modal>}
-      {modal === 'sale' && <Modal title="Nouvelle vente guichet" close={() => setModal(null)}><form className="form" onSubmit={sellTicket}><label>Voyage<select><option>07:00 · Ouagadougou → Bobo-Dioulasso</option><option>09:30 · Ouagadougou → Koudougou</option></select></label><div className="form-grid"><label>Nom du passager<input required placeholder="Nom complet" /></label><label>Téléphone<input required placeholder="70 00 00 00" /></label><label>Place<input required placeholder="A12" /></label><label>Paiement<select><option>Orange Money</option><option>Moov Money</option><option>Telecel Money</option><option>Wave</option><option>Espèces</option></select></label></div><div className="amount">Prix du billet <strong>7 500 FCFA</strong></div><button type="submit">Confirmer la vente</button></form></Modal>}
+      {modal === 'sale' && <Modal title="Nouvelle vente guichet" close={() => setModal(null)}><form className="form" onSubmit={sellTicket}><label>Voyage<select name="tripId" required>{trips.map((trip) => <option key={trip.id} value={trip.id}>{trip.time} · {trip.route}{trip.availableSeatNumber ? ` · place ${trip.availableSeatNumber}` : ''}</option>)}</select></label><div className="form-grid"><label>Nom du passager<input name="fullName" required placeholder="Nom complet" /></label><label>Téléphone<input name="phone" required placeholder="70 00 00 00" /></label><label>Paiement<select name="paymentProvider"><option value="ORANGE_MONEY">Orange Money</option><option value="MOOV_MONEY">Moov Money</option><option value="TELECEL_MONEY">Telecel Money</option><option value="WAVE">Wave</option><option value="CASH">Espèces</option></select></label></div><div className="amount">Prix du billet <strong>Le tarif du voyage sera appliqué</strong></div><button type="submit">Confirmer la vente et imprimer</button></form></Modal>}
       {modal === 'baggage' && <Modal title="Enregistrer un bagage" close={() => setModal(null)}><form className="form" onSubmit={registerBaggage}><label>Référence du billet<input name="ticketReference" placeholder="FT-2026-00482" required /></label><div className="form-grid"><label>Description<input name="description" placeholder="Valise noire" required /></label><label>Poids (kg)<input name="weightKg" type="number" min="1" max="100" required /></label></div><label>Note (facultatif)<input name="note" placeholder="Fragile, à remettre à l’arrivée..." /></label><button type="submit">Créer le suivi bagage</button></form></Modal>}
       {modal === 'scan' && <Modal title="Contrôle d’embarquement" close={() => setModal(null)}><form className="scanner" onSubmit={scanTicket}><div className="qr">▦</div><strong>Scanner le QR code du billet</strong><p>Positionnez le code devant la caméra ou saisissez la référence.</p><input name="reference" placeholder="FT-2026-00482" required /><button type="submit">Valider le billet</button></form></Modal>}
       {modal === 'help' && <Modal title="Aide Siira" close={() => setModal(null)}><p>Support société : <strong>70 00 00 00</strong>, du lundi au samedi de 7h à 22h.</p><button onClick={() => setModal(null)}>Fermer</button></Modal>}
