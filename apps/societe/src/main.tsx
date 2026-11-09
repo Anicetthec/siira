@@ -23,6 +23,7 @@ function App() {
   const [modal, setModal] = useState<'trip' | 'sale' | 'baggage' | 'scan' | 'help' | 'profile' | 'login' | null>(null);
   const [tripPeriod, setTripPeriod] = useState<'today' | 'tomorrow' | 'week'>('today');
   const [loginError, setLoginError] = useState('');
+  const [authenticated, setAuthenticated] = useState(false);
   const [online, setOnline] = useState(navigator.onLine);
   const [pending, setPending] = useState(pendingCount());
 
@@ -235,8 +236,12 @@ function App() {
       return;
     }
     setLoginError('');
-    setModal(null);
+    setAuthenticated(true);
     notify('Connexion société réussie.');
+  }
+
+  if (!authenticated) {
+    return <LoginScreen error={loginError} onSubmit={loginCompany} />;
   }
 
   return (
@@ -253,7 +258,7 @@ function App() {
         <div className="company-card"><small>SOCIÉTÉ CONNECTÉE SUR SIIRA</small><strong>Rakieta Transport</strong><span>Ouagadougou · Abonnement actif</span></div>
       </aside>
       <section className="content">
-        <header><div><p className="eyebrow">JEUDI 06 NOVEMBRE 2026 · AFRIQUE/Ouagadougou</p><h1>{title[1]}</h1><p className="subheading">{active !== 'dashboard' && title[0]}</p><p className="offline-status">{online ? 'En ligne' : 'Hors ligne'}{pending > 0 ? ` · ${pending} opération(s) en attente` : ''}</p></div><div className="header-actions"><button className="outline" onClick={() => setModal('help')}>Aide</button><button className="outline" onClick={() => setModal('profile')}>Mon profil</button><button className="outline" onClick={() => setModal('scan')}>▣ Scanner un billet</button><button className="outline" onClick={() => { setLoginError(''); setModal('login'); }}>Se connecter</button><button onClick={() => setModal('trip')}>+ Créer un voyage</button></div></header>
+        <header><div><p className="eyebrow">JEUDI 06 NOVEMBRE 2026 · AFRIQUE/Ouagadougou</p><h1>{title[1]}</h1><p className="subheading">{active !== 'dashboard' && title[0]}</p><p className="offline-status">{online ? 'En ligne' : 'Hors ligne'}{pending > 0 ? ` · ${pending} opération(s) en attente` : ''}</p></div><div className="header-actions"><button className="outline" onClick={() => setModal('help')}>Aide</button><button className="outline" onClick={() => setModal('profile')}>Mon profil</button><button className="outline" onClick={() => setModal('scan')}>▣ Scanner un billet</button><button onClick={() => setModal('trip')}>+ Créer un voyage</button></div></header>
         {notice && <div className="toast">✓ {notice}</div>}
         {active === 'dashboard' && <Dashboard trips={trips} onSale={() => setModal('sale')} onExport={exportReport} onManage={(name) => notify(`Gestion de l’agence ${name} ouverte.`)} onViewAll={() => setActive('trips')} />}
         {active === 'trips' && <Trips trips={trips} onCreate={() => setModal('trip')} period={tripPeriod} onPeriodChange={setTripPeriod} />}
@@ -269,7 +274,29 @@ function App() {
       {modal === 'scan' && <Modal title="Contrôle d’embarquement" close={() => setModal(null)}><form className="scanner" onSubmit={scanTicket}><div className="qr">▦</div><strong>Scanner le QR code du billet</strong><p>Positionnez le code devant la caméra ou saisissez la référence.</p><input name="reference" placeholder="FT-2026-00482" required /><button type="submit">Valider le billet</button></form></Modal>}
       {modal === 'help' && <Modal title="Aide Siira" close={() => setModal(null)}><p>Support société : <strong>70 00 00 00</strong>, du lundi au samedi de 7h à 22h.</p><button onClick={() => setModal(null)}>Fermer</button></Modal>}
       {modal === 'profile' && <Modal title="Profil de la société" close={() => setModal(null)}><p><strong>Rakieta Transport</strong><br />Code compagnie : RAK<br />Compte administrateur actif.</p><button onClick={() => setModal(null)}>Fermer</button></Modal>}
-      {modal === 'login' && <Modal title="Connexion société" close={() => setModal(null)}><form className="form" onSubmit={(event) => void loginCompany(event)}><label>Email<input name="email" type="email" placeholder="admin@rakieta.bf" required /></label><label>Mot de passe<input name="password" type="password" minLength={8} required /></label>{loginError && <p className="form-error">{loginError}</p>}<button type="submit">Se connecter</button></form></Modal>}
+    </main>
+  );
+}
+
+function LoginScreen({ error, onSubmit }: { error: string; onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void> }) {
+  return (
+    <main className="login-screen">
+      <section className="login-panel">
+        <div className="login-brand"><img src="/siira-logo.svg" alt="Siira" /><strong>Siira</strong></div>
+        <p className="login-eyebrow">ESPACE SOCIÉTÉ</p>
+        <h1>Bienvenue sur votre espace</h1>
+        <p className="login-intro">Connectez-vous pour gérer vos voyages, vos ventes et vos agences.</p>
+        <form className="form login-form" onSubmit={(event) => void onSubmit(event)}>
+          <label>Email professionnel<input name="email" type="email" placeholder="admin@rakieta.bf" autoComplete="email" required /></label>
+          <label>Mot de passe<input name="password" type="password" placeholder="Votre mot de passe" autoComplete="current-password" minLength={8} required /></label>
+          {error && <p className="form-error" role="alert">{error}</p>}
+          <button type="submit">Se connecter</button>
+        </form>
+        <p className="login-help">Besoin d’aide ? Contactez le support Siira au <strong>70 00 00 00</strong>.</p>
+      </section>
+      <aside className="login-aside">
+        <div className="login-aside-content"><span className="login-mark">S</span><h2>Pilotez votre activité transport simplement.</h2><p>Une plateforme pensée pour les sociétés de transport au Burkina Faso.</p></div>
+      </aside>
     </main>
   );
 }
